@@ -35,14 +35,20 @@ import helios.engine.runtime.messaging.command.CommandHandlerRegistry;
 #define HELIOS_LOG_SCOPE "helios::gameplay::spawning::SpawnManager"
 export namespace helios::gameplay::spawning {
 
-    template<typename ...TMemberHandles>
-    class SpawnManager {
+    template<typename TEntityPoolRegistry>
+    class SpawnManager;
+
+    template<
+        template<typename> typename TLookupStrategy,
+        typename ...TMemberHandles
+    >
+    class SpawnManager<engine::runtime::pooling::TypedEntityPoolRegistry<TLookupStrategy, TMemberHandles...>> {
 
 
         using UpdateContext = engine::runtime::world::UpdateContext;
         using LogManager = engine::util::log::LogManager;
         using CommandHandlerRegistry = engine::runtime::messaging::command::CommandHandlerRegistry;
-        using EngineEntityPoolRegistry = engine::runtime::pooling::TypedEntityPoolRegistry<TMemberHandles...>;
+        using EngineEntityPoolRegistry = engine::runtime::pooling::TypedEntityPoolRegistry<TLookupStrategy, TMemberHandles...>;
         using EngineSpawnPolicyRegistry = spawning::TypedSpawnPolicyRegistry<TMemberHandles...>;
 
         static inline auto& logger_ = LogManager::loggerForScope(HELIOS_LOG_SCOPE);
