@@ -9,20 +9,20 @@ export module helios.gameplay.spawning.SpawnPolicyRegistry;
 
 import helios.gameplay.spawning.SpawnPolicy;
 import helios.gameplay.spawning.types;
-import helios.engine.core.container.ConceptModelRegistry;
+import helios.engine.core.container;
 
 
 export namespace helios::gameplay::spawning {
 
     /**
-     * @brief `ConceptModelRegistry` specialisation that stores `SpawnPolicy` instances
-     *        keyed by `SpawnPolicyTypeId`.
+     * @brief `ConceptModelCollectionRegistry` specialisation that stores `SpawnPolicy` instances in buckets indexed by
+     * `SpawnPolicyTypeId`.
      *
      * @tparam TEmitterHandle  Handle type of the emitting entity.
      * @tparam TSpawnHandle    Handle type of the spawned entities.
      */
     template<typename TEmitterHandle, typename TSpawnHandle>
-    using SpawnPolicyRegistry = helios::engine::core::container::ConceptModelRegistry<
+    using SpawnPolicyRegistry = helios::engine::core::container::ConceptModelCollectionRegistry<
         SpawnPolicy<TEmitterHandle, TSpawnHandle>, types::SpawnPolicyTypeId<TEmitterHandle, TSpawnHandle>
     >;
 
