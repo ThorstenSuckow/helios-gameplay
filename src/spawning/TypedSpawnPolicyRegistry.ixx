@@ -6,28 +6,90 @@ module;
 
 #include <tuple>
 #include <utility>
+#include <cassert>
 
 export module helios.gameplay.spawning.TypedSpawnPolicyRegistry;
 
+import helios.engine.util.log;
+import helios.engine.core.types;
+
+import helios.gameplay.spawning.types;
 import helios.gameplay.spawning.concepts;
 import helios.gameplay.spawning.SpawnPolicy;
 import helios.gameplay.spawning.SpawnPolicyRegistry;
 
 import helios.gameplay.spawning.types;
 
-import helios.engine.core.container.ConceptModelRegistry;
+import helios.ecs.concepts;
 
+import helios.engine.core.container;
 
+#define HELIOS_LOG_SCOPE "helios::gameplay::spawning::TypedSpawnPolicyRegistry"
 export namespace helios::gameplay::spawning {
 
     /**
      * @brief Holds a `SpawnPolicyRegistry` for every `(TEmitter, TSpawn)` pair derivable from `TMemberHandles`.
      *
-     * @tparam TMemberHandles  Pack of all handle types that may act as emitters or spawn targets.
+     * @tparam TStrongIdLookupStrategy Strategy template used to track unique runtime policy IDs per pair.
+     * @tparam TMemberHandles Pack of all handle types that may act as emitters or spawn targets.
      */
-    template<typename ... TMemberHandles>
+    template<
+        template<typename> typename TStrongIdLookupStrategy,
+        typename ... TMemberHandles
+    >
+    requires (helios::ecs::concepts::IsStrongIdCollisionResolverLike<TStrongIdLookupStrategy<TMemberHandles>> && ...)
+        && (sizeof ...(TMemberHandles) > 0)
     class TypedSpawnPolicyRegistry {
+        
+        /**
+         * @brief Tag type used to create one lookup strategy instance per `(emitter, spawn)` pair.
+         *
+         * @tparam TEmitterHandle Emitter handle type.
+         * @tparam TSpawnHandle Spawn handle type.
+         */
+        template<typename TEmitterHandle, typename TSpawnHandle>
+        struct StrongIdLookupStrategyTag {};
+        
+        /**
+         * @brief Tuple of lookup strategies for one emitter against all spawn handle types.
+         *
+         * @tparam TEmitterHandle Emitter handle type.
+         * @tparam TSpawnHandle Spawn handle type pack.
+         */
+        template<typename TEmitterHandle, typename ... TSpawnHandle>
+        using StrongIdLookupStrategiesForEmitter = std::tuple<
+            TStrongIdLookupStrategy<StrongIdLookupStrategyTag<TEmitterHandle, TSpawnHandle>>...
+        >;
+        
+        /**
+         * @brief Flat tuple type containing all lookup strategy instances across handle combinations.
+         *
+         * @tparam THandles Handle type pack.
+         */
+        template<typename ... THandles>
+        using AllStrongIdLookupStrategies = decltype(std::tuple_cat(
+            std::declval<StrongIdLookupStrategiesForEmitter<THandles, THandles...>>()...
+        ));
+        
+        /**
+         * @brief Runtime storage for all lookup strategy instances.
+         */
+        AllStrongIdLookupStrategies<TMemberHandles...> strongIdLookupStrategies_;
+        
+        /**
+         * @brief Returns the lookup strategy assigned to one `(emitter, spawn)` pair.
+         *
+         * @tparam TEmitter Emitter handle type.
+         * @tparam TSpawn Spawn handle type.
+         * @return Reference to the corresponding lookup strategy.
+         */
+        template<typename TEmitter, typename TSpawn>
+        TStrongIdLookupStrategy<StrongIdLookupStrategyTag<TEmitter, TSpawn>>& strongIdLookupStrategy() noexcept {
+            return std::get<TStrongIdLookupStrategy<StrongIdLookupStrategyTag<TEmitter, TSpawn>>>(strongIdLookupStrategies_);
+        }
 
+        static inline auto& logger_ = helios::engine::util::log::LogManager::loggerForScope(HELIOS_LOG_SCOPE);
+        
         /**
          * @brief Tuple type holding one `SpawnPolicyRegistry` per `(TEmitterHandle, TSpawnHandle)` combination.
          */
@@ -45,6 +107,9 @@ export namespace helios::gameplay::spawning {
                     std::declval<RegistryForSource<THandles, THandles...>>()...)
         );
 
+        template<typename TEmitterHandle, typename TSpawnHandle>
+        using ConceptModelCollectionKey = engine::core::types::ConceptModelCollectionKey<types::SpawnPolicyTypeId<TEmitterHandle, TSpawnHandle>>;
+
         /**
          * @brief Storage for all registries, indexed by type via `std::get`.
          */
@@ -55,8 +120,9 @@ export namespace helios::gameplay::spawning {
         /**
          * @brief Returns the mutable `SpawnPolicyRegistry` for the given emitter/spawn handle pair.
          *
-         * @tparam TEmitterHandle  Emitter handle type.
-         * @tparam TSpawnHandle    Spawn handle type.
+         * @tparam TEmitterHandle Emitter handle type.
+         * @tparam TSpawnHandle Spawn handle type.
+         * @return Reference to the matching registry.
          */
         template<typename TEmitterHandle, typename TSpawnHandle>
         SpawnPolicyRegistry<TEmitterHandle, TSpawnHandle>& registry() noexcept {
@@ -66,8 +132,9 @@ export namespace helios::gameplay::spawning {
         /**
          * @brief Returns the const `SpawnPolicyRegistry` for the given emitter/spawn handle pair.
          *
-         * @tparam TEmitterHandle  Emitter handle type.
-         * @tparam TSpawnHandle    Spawn handle type.
+         * @tparam TEmitterHandle Emitter handle type.
+         * @tparam TSpawnHandle Spawn handle type.
+         * @return Const reference to the matching registry.
          */
         template<typename TEmitterHandle, typename TSpawnHandle>
         const SpawnPolicyRegistry<TEmitterHandle, TSpawnHandle>& registry() const noexcept {
@@ -75,118 +142,111 @@ export namespace helios::gameplay::spawning {
         }
 
         /**
-         * @brief Returns all registered policy items for the given handle pair (const).
+         * @brief Returns all registered policy collections for the given handle pair (const).
          *
-         * @tparam TEmitterHandle  Emitter handle type.
-         * @tparam TSpawnHandle    Spawn handle type.
+         * @tparam TEmitterHandle Emitter handle type.
+         * @tparam TSpawnHandle Spawn handle type.
+         * @return Const grouped view of policy wrappers.
          */
         template<typename TEmitterHandle, typename TSpawnHandle>
-        [[nodiscard]] auto items() const noexcept {
-            return registry<TEmitterHandle, TSpawnHandle>().items();
+        [[nodiscard]] auto collections() const noexcept {
+            return registry<TEmitterHandle, TSpawnHandle>().collections();
         }
 
         /**
-         * @brief Returns all registered policy items for the given handle pair.
+         * @brief Returns all registered policy collections for the given handle pair.
          *
-         * @tparam TEmitterHandle  Emitter handle type.
-         * @tparam TSpawnHandle    Spawn handle type.
+         * @tparam TEmitterHandle Emitter handle type.
+         * @tparam TSpawnHandle Spawn handle type.
+         * @return Mutable grouped view of policy wrappers.
          */
         template<typename TEmitterHandle, typename TSpawnHandle>
-        [[nodiscard]] auto items() noexcept {
-            return registry<TEmitterHandle, TSpawnHandle>().items();
+        [[nodiscard]] auto collections() noexcept {
+            return registry<TEmitterHandle, TSpawnHandle>().collections();
         }
 
 
         /**
          * @brief Constructs and registers a `TSpawnPolicy` in the matching registry.
          *
-         * @tparam TSpawnPolicy  Concrete policy type satisfying `IsSpawnPolicyLike`.
-         * @tparam Args          Constructor argument types.
-         * @param args           Arguments forwarded to the policy constructor.
-         *
-         * @return Reference to the newly added policy.
+         * @tparam TSpawnPolicy Concrete policy type satisfying `IsSpawnPolicyLike`.
+         * @tparam TSpawnPolicyId Runtime strong-id type used to identify one policy instance.
+         * @tparam Args Constructor argument types.
+         * @param spawnPolicyId Runtime policy ID.
+         * @param args Arguments forwarded to the policy constructor.
+         * @return Valid `SpawnPolicyKey` on success; invalid key on duplicate ID.
          */
-        template<typename TSpawnPolicy, typename... Args>
+        template<typename TSpawnPolicy, typename TSpawnPolicyId, typename... Args>
         requires concepts::IsSpawnPolicyLike<TSpawnPolicy>
-        TSpawnPolicy& add(Args&&... args) {
+        auto createPolicy(TSpawnPolicyId spawnPolicyId, Args&&... args) {
             using EmitterType = typename TSpawnPolicy::EmitterHandle_type;
             using SpawnType = typename TSpawnPolicy::SpawnHandle_type;
 
-            return registry<EmitterType, SpawnType>().template add<TSpawnPolicy>(std::forward<Args>(args)...);
-         }
+            auto& strongIdLookupStrat = strongIdLookupStrategy<EmitterType, SpawnType>();
 
+            if (strongIdLookupStrat.has(spawnPolicyId.value())) {
+                logger_.error("Spawn policy ID already exists for the given emitter/spawn handle pair.");
+                assert(false && "Spawn policy ID already exists for the given emitter/spawn handle pair.");
+                return types::SpawnPolicyKey<EmitterType, SpawnType>();
+            }
+            
+            strongIdLookupStrat.add(spawnPolicyId.value());
 
-        /**
-         * @brief Registers a `TSpawnPolicy` from an existing `SpawnPolicy` wrapper.
-         *
-         * @tparam TSpawnPolicy  Concrete policy type satisfying `IsSpawnPolicyLike`.
-         * @param wrapper        Rvalue `SpawnPolicy` wrapper to move into the registry.
-         *
-         * @return Reference to the registered policy.
-         */
-        template<typename TSpawnPolicy>
-        requires concepts::IsSpawnPolicyLike<TSpawnPolicy>
-        TSpawnPolicy& add(
-            SpawnPolicy<
-                typename TSpawnPolicy::EmitterHandle_type,
-                typename TSpawnPolicy::SpawnHandle_type
-            >&& wrapper) {
-            using EmitterType = typename TSpawnPolicy::EmitterHandle_type;
-            using SpawnType = typename TSpawnPolicy::SpawnHandle_type;
+            auto key = registry<EmitterType, SpawnType>().template add<TSpawnPolicy>(std::forward<Args>(args)...);
 
-            return registry<EmitterType, SpawnType>().template add<TSpawnPolicy>(std::move(wrapper));
+            return types::SpawnPolicyKey<EmitterType, SpawnType>(
+                key.typeId,
+                key.index,
+                spawnPolicyId
+            );
         }
 
-
         /**
-         * @brief Returns `true` if a policy of type `TSpawnPolicy` is registered.
+         * @brief Returns the registered policy wrapper addressed by `SpawnPolicyKey`.
          *
-         * @tparam TSpawnPolicy  Concrete policy type satisfying `IsSpawnPolicyLike`.
-         */
-        template<typename TSpawnPolicy>
-        requires concepts::IsSpawnPolicyLike<TSpawnPolicy>
-        [[nodiscard]] bool has() const {
-            using EmitterType = typename TSpawnPolicy::EmitterHandle_type;
-            using SpawnType = typename TSpawnPolicy::SpawnHandle_type;
-
-            return registry<EmitterType, SpawnType>().template has<TSpawnPolicy>();
-        }
-
-
-        /**
-         * @brief Returns a pointer to the registered `TSpawnPolicy`, or `nullptr` if absent.
+         * @detail Additionally checks if the runtime id is existing with this registry, which might produces
+         * unnecessary overhead. Use item(ConceptModelCollectionKey) instead.
          *
-         * @tparam TSpawnPolicy  Concrete policy type satisfying `IsSpawnPolicyLike`.
-         */
-        template<typename TSpawnPolicy>
-        requires concepts::IsSpawnPolicyLike<TSpawnPolicy>
-        [[nodiscard]] TSpawnPolicy* item() const {
-            using EmitterType = typename TSpawnPolicy::EmitterHandle_type;
-            using SpawnType = typename TSpawnPolicy::SpawnHandle_type;
-
-            return registry<EmitterType, SpawnType>().template item<TSpawnPolicy>();
-        }
-
-        template<typename TSpawnPolicy>
-        requires concepts::IsSpawnPolicyLike<TSpawnPolicy>
-        [[nodiscard]] const TSpawnPolicy* item() const {
-            using EmitterType = typename TSpawnPolicy::EmitterHandle_type;
-            using SpawnType = typename TSpawnPolicy::SpawnHandle_type;
-
-            return registry<EmitterType, SpawnType>().template item<TSpawnPolicy>();
-        }
-
-
-        /**
-         * @brief Returns a policy by its `SpawnPolicyTypeId`, or `nullptr` if not found.
-         *
-         * @tparam TEmitterHandle  Emitter handle type.
-         * @tparam TSpawnHandle    Spawn handle type.
-         * @param typeId           Runtime type identifier of the policy.
+         * @tparam TEmitterHandle Emitter handle type.
+         * @tparam TSpawnHandle Spawn handle type.
+         * @param key Composite spawn policy key.
+         * @return Pointer to the stored wrapper, or `nullptr` if validation fails.
          */
         template<typename TEmitterHandle, typename TSpawnHandle>
-        [[nodiscard]] auto* item(types::SpawnPolicyTypeId<TEmitterHandle, TSpawnHandle> typeId) noexcept {
-            return registry<TEmitterHandle, TSpawnHandle>().item(typeId);
+        auto* item(const types::SpawnPolicyKey<TEmitterHandle, TSpawnHandle> key) noexcept {
+
+            if (!key.isValid()) {
+                logger_.warn("SpawnPolicyKey is invalid");
+                assert(false && "SpawnPolicyKey is invalid");
+                return nullptr;
+            }
+
+            if (auto& lookupStrategy = strongIdLookupStrategy<TEmitterHandle, TSpawnHandle>();
+                !lookupStrategy.has(key.typeId().value())) {
+                logger_.warn("SpawnPolicyKey with this strong ID not registered.");
+                assert(false && "SpawnPolicyKey with this strong ID not registered.");
+                return nullptr;
+            }
+
+            return registry<TEmitterHandle, TSpawnHandle>().item(
+                ConceptModelCollectionKey<TEmitterHandle, TSpawnHandle>{key.typeId(), key.index()
+            });
+        }
+
+        /**
+         * @brief Returns the registered policy wrapper addressed by concept-model collection key.
+         *
+         * @details If further runtime identification is required, use item(SpawnPolicyKey) instead
+         *
+         * @tparam TEmitterHandle Emitter handle type.
+         * @tparam TSpawnHandle Spawn handle type.
+         * @param key Type-id and index key from the underlying collection.
+         * @return Pointer to the stored wrapper, or `nullptr` if not found.
+         */
+        template<typename TEmitterHandle, typename TSpawnHandle>
+        auto* item(const ConceptModelCollectionKey<TEmitterHandle, TSpawnHandle> key) noexcept {
+
+            return registry<TEmitterHandle, TSpawnHandle>().item(key);
         }
 
 
