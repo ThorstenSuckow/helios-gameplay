@@ -11,6 +11,7 @@ module;
 
 export module helios.gameplay.spawning.SpawnManager;
 
+import helios.ecs.common.concepts;
 import helios.gameplay.spawning.commands;
 import helios.gameplay.spawning.types;
 import helios.gameplay.spawning.concepts;
@@ -29,12 +30,14 @@ import helios.engine.runtime.pooling.types;
 import helios.gameplay.spawning.TypedSpawnPolicyRegistry;
 
 import helios.engine.runtime.world.UpdateContext;
-import helios.engine.runtime.world.tags.ManagerRole;
+import helios.ecs.manager.tags;
+import helios.ecs.common.types;
 import helios.engine.runtime.world.types;
+import helios.engine.runtime.world.concepts;
 
-import helios.engine.util.log;
+import helios.core.log;
 
-import helios.engine.runtime.messaging.command.CommandHandlerRegistry;
+import helios.ecs.command.CommandHandlerRegistry;
 
 #define HELIOS_LOG_SCOPE "helios::gameplay::spawning::SpawnManager"
 export namespace helios::gameplay::spawning {
@@ -45,7 +48,7 @@ export namespace helios::gameplay::spawning {
      * @tparam TSpawnPolicyRegistry Registry type used for spawn policies.
      * @tparam TEntityPoolRegistry Registry type used for entity pools.
      */
-    template<typename TSpawnPolicyRegistry, typename TEntityPoolRegistry>
+    template<typename TSpawnPolicyRegistry, typename TEntityPoolRegistry, typename TInitContext, typename TExecutionContext>
     class SpawnManager;
 
     /**
@@ -56,13 +59,18 @@ export namespace helios::gameplay::spawning {
      * @tparam TMemberHandles Handle types supported as emitter/spawn domains.
      */
     template<
+        typename TInitContext,
+        typename TExecutionContext,
         template<typename> typename TSpawnPolicyStrongIdLookupStrategy,
         template<typename> typename TEntityPoolStrongIdLookupStrategy,
         typename ...TMemberHandles
     >
+    requires ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry> &&
+        engine::runtime::world::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext>
     class SpawnManager<
         gameplay::spawning::TypedSpawnPolicyRegistry<TSpawnPolicyStrongIdLookupStrategy, TMemberHandles...>,
-        engine::runtime::pooling::TypedEntityPoolRegistry<TEntityPoolStrongIdLookupStrategy, TMemberHandles...>
+        engine::runtime::pooling::TypedEntityPoolRegistry<TEntityPoolStrongIdLookupStrategy, TMemberHandles...>,
+        TInitContext, TExecutionContext
     > {
 
 
@@ -74,12 +82,12 @@ export namespace helios::gameplay::spawning {
         /**
          * @brief Alias for engine log manager.
          */
-        using LogManager = engine::util::log::LogManager;
+        using LogManager = core::log::LogManager;
 
         /**
          * @brief Alias for command handler registry.
          */
-        using CommandHandlerRegistry = engine::runtime::messaging::command::CommandHandlerRegistry;
+        using CommandHandlerRegistry = ecs::command::CommandHandlerRegistry;
 
         /**
          * @brief Typed registry alias for entity pools.
@@ -266,7 +274,7 @@ export namespace helios::gameplay::spawning {
          * @param spawnCommands Queue to process.
          */
         template<typename TEmitterHandle, typename TSpawnHandle>
-        void flushSpawnCommands(UpdateContext& updateContext,
+        void executeSpawnCommands(UpdateContext& updateContext,
             std::vector<commands::SpawnCommand<TEmitterHandle, TSpawnHandle>>& spawnCommands) {
 
             for (auto& spawnCommand: spawnCommands) {
@@ -357,7 +365,9 @@ export namespace helios::gameplay::spawning {
         /**
          * @brief Declares this type as an engine manager role.
          */
-        using EngineRoleTag = engine::runtime::world::tags::ManagerRole;
+        using EcsRoleTag = ecs::manager::tags::ManagerRole;
+        using ExecutionContextType = TExecutionContext;
+        using InitContextType = TInitContext;
 
         /**
          * @brief Constructs the spawn manager with registries for policies and pools.
@@ -392,8 +402,10 @@ export namespace helios::gameplay::spawning {
          *
          * @param commandHandlerRegistry Registry receiving command bindings.
          */
-        void init(engine::runtime::messaging::command::CommandHandlerRegistry& commandHandlerRegistry) noexcept {
+        bool init(TInitContext& initContext) noexcept {
+            auto& commandHandlerRegistry = initContext.commandHandlerRegistry();
             registerAllCommands<TMemberHandles...>(commandHandlerRegistry);
+            return true;
         }
 
         /**
@@ -401,17 +413,24 @@ export namespace helios::gameplay::spawning {
          *
          * @param updateContext Current world update context.
          */
-        void flush(engine::runtime::world::UpdateContext& updateContext) noexcept {
+        bool executeCommands(TExecutionContext& executionContext) noexcept {
+
+            auto& updateContext = executionContext.updateContext();
 
             std::apply([&updateContext, this](auto& ... spawnCommands) {
-                (flushSpawnCommands(updateContext, spawnCommands), ...);
+                (executeSpawnCommands(updateContext, spawnCommands), ...);
             }, spawnCommandVectors_);
 
             std::apply([](auto& ...spawnCommands) noexcept {
                 (spawnCommands.clear(), ...);
             }, spawnCommandVectors_);
+
+            return true;
         }
 
+        void reset() {
+            /*intentionally noop*/
+        }
 
     };
 
