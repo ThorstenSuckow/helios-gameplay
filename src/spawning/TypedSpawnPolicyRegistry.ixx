@@ -10,8 +10,9 @@ module;
 
 export module helios.gameplay.spawning.TypedSpawnPolicyRegistry;
 
-import helios.engine.util.log;
-import helios.engine.core.types;
+import helios.core.concepts;
+import helios.core.log;
+import helios.core.common.types;
 
 import helios.gameplay.spawning.types;
 import helios.gameplay.spawning.concepts;
@@ -20,9 +21,9 @@ import helios.gameplay.spawning.SpawnPolicyRegistry;
 
 import helios.gameplay.spawning.types;
 
-import helios.ecs.concepts;
+import helios.ecs.common.concepts;
 
-import helios.engine.core.container;
+import helios.core.container;
 
 #define HELIOS_LOG_SCOPE "helios::gameplay::spawning::TypedSpawnPolicyRegistry"
 export namespace helios::gameplay::spawning {
@@ -37,7 +38,7 @@ export namespace helios::gameplay::spawning {
         template<typename> typename TStrongIdLookupStrategy,
         typename ... TMemberHandles
     >
-    requires (helios::ecs::concepts::IsStrongIdCollisionResolverLike<TStrongIdLookupStrategy<TMemberHandles>> && ...)
+    requires (helios::core::concepts::IsStrongIdCollisionResolverLike<TStrongIdLookupStrategy<TMemberHandles>> && ...)
         && (sizeof ...(TMemberHandles) > 0)
     class TypedSpawnPolicyRegistry {
         
@@ -88,7 +89,7 @@ export namespace helios::gameplay::spawning {
             return std::get<TStrongIdLookupStrategy<StrongIdLookupStrategyTag<TEmitter, TSpawn>>>(strongIdLookupStrategies_);
         }
 
-        static inline auto& logger_ = helios::engine::util::log::LogManager::loggerForScope(HELIOS_LOG_SCOPE);
+        static inline auto& logger_ = helios::core::log::LogManager::loggerForScope(HELIOS_LOG_SCOPE);
         
         /**
          * @brief Tuple type holding one `SpawnPolicyRegistry` per `(TEmitterHandle, TSpawnHandle)` combination.
@@ -108,7 +109,7 @@ export namespace helios::gameplay::spawning {
         );
 
         template<typename TEmitterHandle, typename TSpawnHandle>
-        using ConceptModelCollectionKey = engine::core::types::ConceptModelCollectionKey<types::SpawnPolicyTypeId<TEmitterHandle, TSpawnHandle>>;
+        using ConceptModelCollectionKey = core::container::types::ConceptModelCollectionKey<types::SpawnPolicyTypeId<TEmitterHandle, TSpawnHandle>>;
 
         /**
          * @brief Storage for all registries, indexed by type via `std::get`.

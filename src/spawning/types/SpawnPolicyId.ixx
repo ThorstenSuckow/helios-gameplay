@@ -7,7 +7,7 @@ module;
 
 export module helios.gameplay.spawning.types:SpawnPolicyId;
 
-import helios.ecs.types.StrongId;
+import helios.core.common.types;
 
 export namespace helios::gameplay::spawning::types {
 
@@ -21,6 +21,6 @@ export namespace helios::gameplay::spawning::types {
      * @tparam TSpawnHandle    Handle type of the spawned entities.
      */
     template<typename TEmitterHandle, typename TSpawnHandle = TEmitterHandle>
-    using SpawnPolicyId = helios::ecs::types::StrongId<SpawnPolicyIdTag<TEmitterHandle, TSpawnHandle>>;
+    using SpawnPolicyId = helios::core::common::types::StrongId<SpawnPolicyIdTag<TEmitterHandle, TSpawnHandle>>;
 
 }

@@ -8,7 +8,7 @@ module;
 
 export module helios.gameplay.spawning.types:SpawnPolicyKey;
 
-import helios.engine.core.types;
+import helios.core.container;
 
 import :SpawnPolicyTypeId;
 import :SpawnPolicyId;
@@ -30,12 +30,12 @@ export namespace helios::gameplay::spawning::types {
         /**
          * @brief Internal key type used by concept-model collections.
          */
-        using ConceptModelKey = helios::engine::core::types::ConceptModelCollectionKey<SpawnPolicyTypeId<TEmitterHandle, TSpawnHandle>>;
+        using ConceptModelKey = helios::core::container::types::ConceptModelCollectionKey<SpawnPolicyTypeId<TEmitterHandle, TSpawnHandle>>;
 
         /**
          * @brief Identifies the concrete spawn policy type.
          */
-        SpawnPolicyTypeId<TEmitterHandle, TSpawnHandle> typeId_{helios::ecs::types::no_init};
+        SpawnPolicyTypeId<TEmitterHandle, TSpawnHandle> typeId_{helios::core::common::types::no_init};
 
         /**
          * @brief Index within the per-type collection.

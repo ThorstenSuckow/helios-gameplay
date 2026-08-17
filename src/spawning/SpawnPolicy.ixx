@@ -6,6 +6,7 @@ module;
 
 #include <memory>
 #include <vector>
+#include <span>
 
 export module helios.gameplay.spawning.SpawnPolicy;
 
