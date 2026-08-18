@@ -23,6 +23,7 @@ import helios.engine.core.types;
 import helios.engine.spatial.components;
 
 import helios.engine.runtime.particle.types;
+import helios.engine.runtime.concepts;
 
 import helios.engine.runtime.pooling.TypedEntityPoolRegistry;
 import helios.engine.runtime.pooling.types;
@@ -66,7 +67,7 @@ export namespace helios::gameplay::spawning {
         typename ...TMemberHandles
     >
     requires ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry> &&
-        engine::runtime::world::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext>
+        engine::runtime::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext>
     class SpawnManager<
         gameplay::spawning::TypedSpawnPolicyRegistry<TSpawnPolicyStrongIdLookupStrategy, TMemberHandles...>,
         engine::runtime::pooling::TypedEntityPoolRegistry<TEntityPoolStrongIdLookupStrategy, TMemberHandles...>,
