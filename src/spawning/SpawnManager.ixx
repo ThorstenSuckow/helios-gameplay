@@ -39,6 +39,7 @@ import helios.engine.runtime.world.concepts;
 import helios.core.log;
 
 import helios.ecs.command.CommandHandlerRegistry;
+import helios.ecs.command.types;
 
 #define HELIOS_LOG_SCOPE "helios::gameplay::spawning::SpawnManager"
 export namespace helios::gameplay::spawning {
@@ -49,7 +50,7 @@ export namespace helios::gameplay::spawning {
      * @tparam TSpawnPolicyRegistry Registry type used for spawn policies.
      * @tparam TEntityPoolRegistry Registry type used for entity pools.
      */
-    template<typename TSpawnPolicyRegistry, typename TEntityPoolRegistry, typename TInitContext, typename TExecutionContext>
+    template<typename TSpawnPolicyRegistry, typename TEntityPoolRegistry>
     class SpawnManager;
 
     /**
@@ -60,18 +61,13 @@ export namespace helios::gameplay::spawning {
      * @tparam TMemberHandles Handle types supported as emitter/spawn domains.
      */
     template<
-        typename TInitContext,
-        typename TExecutionContext,
         template<typename> typename TSpawnPolicyStrongIdLookupStrategy,
         template<typename> typename TEntityPoolStrongIdLookupStrategy,
         typename ...TMemberHandles
     >
-    requires ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry> &&
-        engine::runtime::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext>
     class SpawnManager<
         gameplay::spawning::TypedSpawnPolicyRegistry<TSpawnPolicyStrongIdLookupStrategy, TMemberHandles...>,
-        engine::runtime::pooling::TypedEntityPoolRegistry<TEntityPoolStrongIdLookupStrategy, TMemberHandles...>,
-        TInitContext, TExecutionContext
+        engine::runtime::pooling::TypedEntityPoolRegistry<TEntityPoolStrongIdLookupStrategy, TMemberHandles...>
     > {
 
 
@@ -367,8 +363,7 @@ export namespace helios::gameplay::spawning {
          * @brief Declares this type as an engine manager role.
          */
         using EcsRoleTag = ecs::manager::tags::ManagerRole;
-        using ExecutionContextType = TExecutionContext;
-        using InitContextType = TInitContext;
+
 
         /**
          * @brief Constructs the spawn manager with registries for policies and pools.
@@ -403,6 +398,8 @@ export namespace helios::gameplay::spawning {
          *
          * @param commandHandlerRegistry Registry receiving command bindings.
          */
+        template<typename TInitContext>
+        requires ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry>
         bool init(TInitContext& initContext) noexcept {
             auto& commandHandlerRegistry = initContext.commandHandlerRegistry();
             registerAllCommands<TMemberHandles...>(commandHandlerRegistry);
@@ -414,6 +411,8 @@ export namespace helios::gameplay::spawning {
          *
          * @param updateContext Current world update context.
          */
+        template<typename TExecutionContext>
+        requires engine::runtime::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext>
         bool executeCommands(TExecutionContext& executionContext) noexcept {
 
             auto& updateContext = executionContext.updateContext();
