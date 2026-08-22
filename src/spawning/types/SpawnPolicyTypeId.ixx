@@ -16,6 +16,6 @@ export namespace helios::gameplay::spawning::types {
      * @brief Unique type identifier for SpawnPolicy resources.
      */
     template<typename TEmitterHandle, typename TSpawnHandle = TEmitterHandle>
-    using SpawnPolicyTypeId = core::common::TypeId<SpawnTypesDomainTag<TEmitterHandle, TSpawnHandle>>;
+    using SpawnPolicyTypeId = core::common::types::TypeId<SpawnTypesDomainTag<TEmitterHandle, TSpawnHandle>>;
 
 };
