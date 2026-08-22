@@ -10,7 +10,7 @@ module;
 
 export module helios.gameplay.spawning.TypedSpawnPolicyRegistry;
 
-import helios.core.concepts;
+import helios.core.common.concepts;
 import helios.core.log;
 import helios.core.common.types;
 
@@ -23,7 +23,7 @@ import helios.gameplay.spawning.types;
 
 import helios.ecs.common.concepts;
 
-import helios.core.container;
+import helios.core.common.container;
 
 #define HELIOS_LOG_SCOPE "helios::gameplay::spawning::TypedSpawnPolicyRegistry"
 export namespace helios::gameplay::spawning {
@@ -38,7 +38,7 @@ export namespace helios::gameplay::spawning {
         template<typename> typename TStrongIdLookupStrategy,
         typename ... TMemberHandles
     >
-    requires (helios::core::concepts::IsStrongIdCollisionResolverLike<TStrongIdLookupStrategy<TMemberHandles>> && ...)
+    requires (helios::core::common::concepts::IsStrongIdCollisionResolverLike<TStrongIdLookupStrategy<TMemberHandles>> && ...)
         && (sizeof ...(TMemberHandles) > 0)
     class TypedSpawnPolicyRegistry {
         
@@ -109,7 +109,7 @@ export namespace helios::gameplay::spawning {
         );
 
         template<typename TEmitterHandle, typename TSpawnHandle>
-        using ConceptModelCollectionKey = core::container::types::ConceptModelCollectionKey<types::SpawnPolicyTypeId<TEmitterHandle, TSpawnHandle>>;
+        using ConceptModelCollectionKey = core::common::container::types::ConceptModelCollectionKey<types::SpawnPolicyTypeId<TEmitterHandle, TSpawnHandle>>;
 
         /**
          * @brief Storage for all registries, indexed by type via `std::get`.

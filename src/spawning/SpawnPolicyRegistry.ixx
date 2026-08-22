@@ -9,7 +9,7 @@ export module helios.gameplay.spawning.SpawnPolicyRegistry;
 
 import helios.gameplay.spawning.SpawnPolicy;
 import helios.gameplay.spawning.types;
-import helios.core.container;
+import helios.core.common.container;
 
 
 export namespace helios::gameplay::spawning {
@@ -22,7 +22,7 @@ export namespace helios::gameplay::spawning {
      * @tparam TSpawnHandle    Handle type of the spawned entities.
      */
     template<typename TEmitterHandle, typename TSpawnHandle>
-    using SpawnPolicyRegistry = helios::core::container::ConceptModelInstanceCollectionRegistry<
+    using SpawnPolicyRegistry = helios::core::common::container::ConceptModelInstanceCollectionRegistry<
         SpawnPolicy<TEmitterHandle, TSpawnHandle>, types::SpawnPolicyTypeId<TEmitterHandle, TSpawnHandle>
     >;
 
