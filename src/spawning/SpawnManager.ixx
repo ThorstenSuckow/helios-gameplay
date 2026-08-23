@@ -31,7 +31,7 @@ import helios.engine.runtime.pooling.types;
 import helios.gameplay.spawning.TypedSpawnPolicyRegistry;
 
 import helios.engine.runtime.world.UpdateContext;
-import helios.ecs.manager.tags;
+
 import helios.ecs.common.types;
 import helios.engine.runtime.world.types;
 import helios.engine.runtime.world.concepts;
@@ -359,10 +359,6 @@ export namespace helios::gameplay::spawning {
 
     public:
 
-        /**
-         * @brief Declares this type as an engine manager role.
-         */
-        using EcsRoleTag = ecs::manager::tags::ManagerRole;
 
 
         /**
@@ -398,10 +394,7 @@ export namespace helios::gameplay::spawning {
          *
          * @param commandHandlerRegistry Registry receiving command bindings.
          */
-        template<typename TInitContext>
-        requires ecs::common::concepts::ProvidesCommandHandlerRegistry<TInitContext, ecs::command::CommandHandlerRegistry>
-        bool init(TInitContext& initContext) noexcept {
-            auto& commandHandlerRegistry = initContext.commandHandlerRegistry();
+        bool init(ecs::command::CommandHandlerRegistry& commandHandlerRegistry) noexcept {
             registerAllCommands<TMemberHandles...>(commandHandlerRegistry);
             return true;
         }
@@ -411,11 +404,8 @@ export namespace helios::gameplay::spawning {
          *
          * @param updateContext Current world update context.
          */
-        template<typename TExecutionContext>
-        requires engine::runtime::concepts::ProvidesUpdateContext<TExecutionContext, engine::runtime::world::UpdateContext>
-        bool executeCommands(TExecutionContext& executionContext) noexcept {
 
-            auto& updateContext = executionContext.updateContext();
+        bool executeCommands(engine::runtime::world::UpdateContext& updateContext) noexcept {
 
             std::apply([&updateContext, this](auto& ... spawnCommands) {
                 (executeSpawnCommands(updateContext, spawnCommands), ...);
