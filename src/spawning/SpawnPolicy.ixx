@@ -10,8 +10,12 @@ module;
 
 export module helios.gameplay.spawning.SpawnPolicy;
 
+import helios.ecs.EntityManager;
+import helios.ecs.Entity;
+
 import helios.gameplay.spawning.types;
 import helios.engine.runtime.world.UpdateContext;
+import helios.engine.runtime.pooling.EntityPool;
 
 using namespace helios::gameplay::spawning::types;
 using namespace helios::engine::runtime::world;
@@ -31,6 +35,10 @@ export namespace helios::gameplay::spawning {
          */
         using SpawnContext = SpawnContext<TEmitterHandle, TSpawnHandle>;
 
+        using SpawnEntityType = ecs::Entity<ecs::EntityManager<TSpawnHandle>>;
+
+        using EntityPool = helios::engine::runtime::pooling::EntityPool<TSpawnHandle>;
+
         /**
          * @brief Abstract interface for the type-erased spawn policy.
          */
@@ -47,13 +55,19 @@ export namespace helios::gameplay::spawning {
             /**
              * @brief Executes the spawn logic; returns the number of successfully spawned entities.
              */
-            virtual std::size_t spawn(UpdateContext& updateContext, const SpawnContext& context, std::span<const TSpawnHandle> spawnHandles) = 0;
+            virtual std::size_t spawn(UpdateContext& updateContext, const SpawnContext& context, std::span<SpawnEntityType> spawnEntities) = 0;
 
             /**
              * @brief Executes the update logic for the submitted SpawnContext; returns `true` on success.
              */
             virtual bool update(UpdateContext& updateContext, SpawnContext& context) = 0;
 
+            /**
+             * @brief Hook for custom logic when an entity was acquired from the pool, before it is spawned.
+             *
+             * @return true to continue spawning, otherwise false.
+             */
+            virtual bool onBeforeSpawn(EntityPool& pool, SpawnEntityType& entity) = 0;
 
             /**
              * @brief Returns a raw pointer to the underlying concrete policy.
@@ -96,8 +110,8 @@ export namespace helios::gameplay::spawning {
             /**
              * @brief Delegates to `policy_.spawn()` to execute spawning.
              */
-            std::size_t spawn(UpdateContext& updateContext, const SpawnContext& spawnContext, std::span<const TSpawnHandle> spawnHandles) override {
-                return policy_.spawn(updateContext, spawnContext, spawnHandles);
+            std::size_t spawn(UpdateContext& updateContext, const SpawnContext& spawnContext, std::span<SpawnEntityType> spawnEntities) override {
+                return policy_.spawn(updateContext, spawnContext, spawnEntities);
             }
 
             /**
@@ -105,6 +119,13 @@ export namespace helios::gameplay::spawning {
              */
             bool update(UpdateContext& updateContext, SpawnContext& spawnContext) override {
                 return policy_.update(updateContext, spawnContext);
+            }
+
+            /**
+             * @copydoc Concept::onBeforeSpawn
+             */
+            bool onBeforeSpawn(EntityPool& pool, SpawnEntityType& entity) override {
+                return policy_.onBeforeSpawn(pool, entity);
             }
 
             /**
@@ -158,8 +179,15 @@ export namespace helios::gameplay::spawning {
         /**
          * @brief Executes the spawn logic; returns the number of successfully spawned entities.
          */
-        std::size_t spawn(UpdateContext& updateContext, const SpawnContext& context, std::span<const TSpawnHandle> spawnHandles) {
-            return pimpl_->spawn(updateContext, context, spawnHandles);
+        std::size_t spawn(UpdateContext& updateContext, const SpawnContext& context, std::span<SpawnEntityType> spawnEntities) {
+            return pimpl_->spawn(updateContext, context, spawnEntities);
+        }
+
+        /**
+         * @copydoc Concept::onBeforeSpawn
+         */
+        bool onBeforeSpawn(EntityPool& pool, SpawnEntityType& entity) {
+            return pimpl_->onBeforeSpawn(pool, entity);
         }
 
         /**
@@ -183,7 +211,7 @@ export namespace helios::gameplay::spawning {
         /**
          * @brief Delegates to `policy_.underlying()` to return a const raw pointer to the stored policy.
          */
-        const void* underlying() const noexcept {
+        void* underlying() const noexcept {
             return pimpl_->underlying();
         }
 
