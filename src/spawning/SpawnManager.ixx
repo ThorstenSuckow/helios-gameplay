@@ -11,7 +11,8 @@ module;
 
 export module helios.gameplay.spawning.SpawnManager;
 
-import helios.ecs.common.concepts;
+import helios.ecs;
+
 import helios.gameplay.spawning.commands;
 import helios.gameplay.spawning.types;
 import helios.gameplay.spawning.concepts;
@@ -32,14 +33,10 @@ import helios.gameplay.spawning.TypedSpawnPolicyRegistry;
 
 import helios.engine.runtime.world.UpdateContext;
 
-import helios.ecs.common.types;
 import helios.engine.runtime.world.types;
 import helios.engine.runtime.world.concepts;
 
 import helios.core.log;
-
-import helios.ecs.command.CommandHandlerRegistry;
-import helios.ecs.command.types;
 
 #define HELIOS_LOG_SCOPE "helios::gameplay::spawning::SpawnManager"
 export namespace helios::gameplay::spawning {
@@ -268,16 +265,16 @@ export namespace helios::gameplay::spawning {
          * @tparam TEmitterHandle Emitter handle type.
          * @tparam TSpawnHandle Spawn handle type.
          * @param updateContext Current world update context.
+         * @param entityManager Entity manager for the spawned entity type.
          * @param spawnCommands Queue to process.
          */
         template<typename TEmitterHandle, typename TSpawnHandle>
-        void executeSpawnCommands(UpdateContext& updateContext,
+        void executeSpawnCommands(
+            UpdateContext& updateContext,
+            ecs::EntityManager<TSpawnHandle>& entityManager,
             std::vector<commands::SpawnCommand<TEmitterHandle, TSpawnHandle>>& spawnCommands) {
 
             for (auto& spawnCommand: spawnCommands) {
-
-                auto spawnContext = types::SpawnContext<TEmitterHandle, TSpawnHandle>{
-                    .requiredAmount = spawnCommand.amount};
 
                 auto key = spawnCommand.spawnPolicyKey.toConceptModelCollectionKey();
 
@@ -289,6 +286,12 @@ export namespace helios::gameplay::spawning {
                     continue;
                 }
 
+                auto spawnContext = types::SpawnContext<TEmitterHandle, TSpawnHandle>{
+                    .requiredAmount = spawnCommand.amount,
+                    .frame = updateContext.frameCount(),
+                    .deltaTime = updateContext.deltaTime()
+                };
+
                 auto entityPoolKey = spawnCommand.entityPoolKey;
 
                 auto* pool = entityPoolRegistry_.template pool<TSpawnHandle>(entityPoolKey);
@@ -298,7 +301,7 @@ export namespace helios::gameplay::spawning {
                     continue;
                 }
 
-                processSpawnPolicy(spawnPolicy, updateContext, spawnContext, pool, spawnCommand.emitterHandle);
+                processSpawnPolicy(entityManager, spawnPolicy, updateContext, spawnContext, pool, spawnCommand.emitterHandle);
             }
 
         }
@@ -308,6 +311,7 @@ export namespace helios::gameplay::spawning {
          *
          * @tparam TEmitterHandle Emitter handle type.
          * @tparam TSpawnHandle Spawn handle type.
+         * @param entityManager Entity manager for the spawned entity type.
          * @param spawnPolicy Spawn policy wrapper to execute.
          * @param updateContext Current world update context.
          * @param spawnContext Mutable spawn context for this execution.
@@ -317,8 +321,11 @@ export namespace helios::gameplay::spawning {
          */
         template<typename TEmitterHandle, typename TSpawnHandle>
         bool processSpawnPolicy(
+            ecs::EntityManager<TSpawnHandle>& entityManager,
             auto* spawnPolicy, UpdateContext& updateContext,
             types::SpawnContext<TEmitterHandle, TSpawnHandle>& spawnContext, auto* pool, TEmitterHandle emitterHandle) noexcept {
+
+            using SpawnEntityType = ecs::Entity<ecs::EntityManager<TSpawnHandle>>;
 
             spawnContext.poolSnapshot = engine::runtime::pooling::types::PoolSnapshot{pool->activeCount(), pool->inactiveCount()};
 
@@ -327,22 +334,28 @@ export namespace helios::gameplay::spawning {
             }
 
             if (auto amount = spawnPolicy->spawnCount(updateContext, spawnContext); amount > 0) {
-                std::vector<TSpawnHandle> spawnHandles;
+                std::vector<SpawnEntityType> spawnEntities;
                 TSpawnHandle spawnHandle{};
                 std::size_t spawned = 0;
                 while (spawned < amount && pool->acquire(spawnHandle)) {
-                    ++spawned;
-                    spawnHandles.push_back(spawnHandle);
+                    if (auto entity = entityManager.entity(spawnHandle)) {
+                        if (spawnPolicy->onBeforeSpawn(*pool, *entity)) {
+                            spawnEntities.push_back(*entity);
+                            ++spawned;
+                        }
+                    } else {
+                        pool->releaseAndRemove(spawnHandle);
+                    }
                 }
 
-                std::size_t used = spawnPolicy->spawn(updateContext, spawnContext, spawnHandles);
+                std::size_t used = spawnPolicy->spawn(updateContext, spawnContext, spawnEntities);
                 assert(used <= spawned && "used must be less than or equal to spawned");
                 spawnContext.spawnedAmount += used;
                 if (used != spawned) {
                     const auto bound = spawned - used;
                     auto i = 0;
-                    for (auto& value : std::views::reverse(spawnHandles)) {
-                        pool->release(value);
+                    for (auto& entity : std::views::reverse(spawnEntities)) {
+                        pool->release(entity.handle());
                         if (++i == bound) {
                             break;
                         }
@@ -404,11 +417,18 @@ export namespace helios::gameplay::spawning {
          *
          * @param updateContext Current world update context.
          */
+        bool executeCommands(engine::runtime::world::UpdateContext& updateContext, ecs::EcsWorld& ecsWorld) noexcept {
 
-        bool executeCommands(engine::runtime::world::UpdateContext& updateContext) noexcept {
-
-            std::apply([&updateContext, this](auto& ... spawnCommands) {
-                (executeSpawnCommands(updateContext, spawnCommands), ...);
+            std::apply([&updateContext, &ecsWorld, this](auto& ... spawnCommands) {
+                ([&] () {
+                    using SpawnCommandVectorType = std::remove_cvref_t<decltype(spawnCommands)>::value_type;
+                    using SpawnCommandType = std::remove_cvref_t<SpawnCommandVectorType>;
+                    executeSpawnCommands(
+                        updateContext,
+                        ecsWorld.entityManager<typename SpawnCommandType::SpawnHandleType>(),
+                        spawnCommands
+                    );
+                }(), ...);
             }, spawnCommandVectors_);
 
             std::apply([](auto& ...spawnCommands) noexcept {
