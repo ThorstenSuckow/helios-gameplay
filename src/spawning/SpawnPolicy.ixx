@@ -7,11 +7,11 @@ module;
 #include <memory>
 #include <vector>
 #include <span>
+#include <cassert>
 
 export module helios.gameplay.spawning.SpawnPolicy;
 
-import helios.ecs.EntityManager;
-import helios.ecs.Entity;
+import helios.ecs;
 
 import helios.gameplay.spawning.types;
 import helios.engine.runtime.world.UpdateContext;
@@ -21,23 +21,26 @@ using namespace helios::gameplay::spawning::types;
 using namespace helios::engine::runtime::world;
 export namespace helios::gameplay::spawning {
 
+
+
+
     /**
      * @brief Type-erased container for a concrete spawn policy operating on `TEmitterHandle`/`TSpawnHandle` pairs.
      *
      * @tparam TEmitterHandle  Handle type of the entity that triggers spawning.
      * @tparam TSpawnHandle    Handle type of the entities to be spawned; defaults to `TEmitterHandle`.
      */
-    template<typename TEmitterHandle, typename TSpawnHandle = TEmitterHandle>
     class SpawnPolicy {
 
         /**
          * @brief Spawn context type alias for this handle pair.
          */
-        using SpawnContext = SpawnContext<TEmitterHandle, TSpawnHandle>;
-
-        using SpawnEntityType = ecs::Entity<ecs::EntityManager<TSpawnHandle>>;
-
-        using EntityPool = helios::engine::runtime::pooling::EntityPool<TSpawnHandle>;
+        using EntityPool = helios::engine::runtime::pooling::EntityPool;
+        using EcsDataContainer = ecs::common::container::EcsDataContainer;
+        using EntityRef = ecs::EntityRef;
+        using EntitySpanRef = ecs::EntitySpanRef;
+        using EcsDataContainerArgumentResolver = ecs::common::container::EcsDataContainerArgumentResolver;
+        using EcsDataContainerFunctionInvoker = ecs::common::container::EcsDataContainerFunctionInvoker;
 
         /**
          * @brief Abstract interface for the type-erased spawn policy.
@@ -50,24 +53,24 @@ export namespace helios::gameplay::spawning {
             /**
              * @brief Returns the number of entities to spawn in the current frame.
              */
-            virtual std::size_t spawnCount(UpdateContext& updateContext, const SpawnContext& context) = 0;
+            virtual std::size_t spawnCount(EcsDataContainer& ecsDataContainer, SpawnContext& spawnContext) = 0;
 
             /**
              * @brief Executes the spawn logic; returns the number of successfully spawned entities.
              */
-            virtual std::size_t spawn(UpdateContext& updateContext, const SpawnContext& context, std::span<SpawnEntityType> spawnEntities) = 0;
+            virtual std::size_t spawn(EcsDataContainer& ecsDataContainer, SpawnContext& spawnContext, EntitySpanRef spawnEntitySpanRef) = 0;
 
             /**
              * @brief Executes the update logic for the submitted SpawnContext; returns `true` on success.
              */
-            virtual bool update(UpdateContext& updateContext, SpawnContext& context) = 0;
+            virtual bool update(EcsDataContainer& ecsDataContainer, SpawnContext& spawnContext) = 0;
 
             /**
              * @brief Hook for custom logic when an entity was acquired from the pool, before it is spawned.
              *
              * @return true to continue spawning, otherwise false.
              */
-            virtual bool onBeforeSpawn(EntityPool& pool, SpawnEntityType& entity) = 0;
+            virtual bool onBeforeSpawn(EcsDataContainer& ecsDataContainer, EntityPool& pool, EntityRef spawnEntity) = 0;
 
             /**
              * @brief Returns a raw pointer to the underlying concrete policy.
@@ -86,46 +89,75 @@ export namespace helios::gameplay::spawning {
          * @tparam T  Concrete spawn policy type.
          */
         template<typename T>
-        class Model : public Concept {
+        class Model;
+
+        template<
+            template <typename, typename> typename T,
+            typename TEmitterHandle,
+            typename TSpawnHandle
+        >
+        class Model<T<TEmitterHandle, TSpawnHandle>> : public Concept {
 
             /**
              * @brief Stored concrete policy instance.
              */
-            T policy_;
+            using TConcretePolicy = T<TEmitterHandle, TSpawnHandle>;
+            
+            TConcretePolicy policy_;
+
 
         public:
 
             /**
              * @brief Constructs the model by moving the given policy.
              */
-            explicit Model(T policy) : policy_(std::move(policy)) {}
+            explicit Model(TConcretePolicy policy) : policy_(std::move(policy)) {}
 
             /**
              * @brief Delegates to `policy_.spawn()` to compute the spawn count.
              */
-            std::size_t spawnCount(UpdateContext& updateContext, const SpawnContext& spawnContext) override {
-                return policy_.spawnCount(updateContext, spawnContext);
+            std::size_t spawnCount(EcsDataContainer& ecsDataContainer, SpawnContext& spawnContext) override {
+                auto& concreteSpawnContext = spawnContext.get<TEmitterHandle, TSpawnHandle>();
+
+                return EcsDataContainerFunctionInvoker::invoke<&TConcretePolicy::spawnCount>(
+                    policy_, ecsDataContainer, concreteSpawnContext
+                );
             }
 
             /**
              * @brief Delegates to `policy_.spawn()` to execute spawning.
              */
-            std::size_t spawn(UpdateContext& updateContext, const SpawnContext& spawnContext, std::span<SpawnEntityType> spawnEntities) override {
-                return policy_.spawn(updateContext, spawnContext, spawnEntities);
+            std::size_t spawn(EcsDataContainer& ecsDataContainer, SpawnContext& spawnContext, EntitySpanRef spawnEntities) override {
+
+                auto& concreteSpawnContext = spawnContext.get<TEmitterHandle, TSpawnHandle>();
+                auto concreteSpawnEntities = spawnEntities.get<TSpawnHandle>();
+
+                return EcsDataContainerFunctionInvoker::invoke<&TConcretePolicy::spawn>(
+                    policy_, ecsDataContainer, concreteSpawnContext, concreteSpawnEntities
+                );
             }
 
             /**
              * @brief Delegates to `policy_.update()` to execute updating.
              */
-            bool update(UpdateContext& updateContext, SpawnContext& spawnContext) override {
-                return policy_.update(updateContext, spawnContext);
+            bool update(EcsDataContainer& ecsDataContainer, SpawnContext& spawnContext) override {
+                auto& concreteSpawnContext = spawnContext.get<TEmitterHandle, TSpawnHandle>();
+
+                return EcsDataContainerFunctionInvoker::invoke<&TConcretePolicy::update>(
+                    policy_, ecsDataContainer, concreteSpawnContext
+                );
             }
 
             /**
              * @copydoc Concept::onBeforeSpawn
              */
-            bool onBeforeSpawn(EntityPool& pool, SpawnEntityType& entity) override {
-                return policy_.onBeforeSpawn(pool, entity);
+            bool onBeforeSpawn(EcsDataContainer& ecsDataContainer, EntityPool& pool, EntityRef spawnEntity) override {
+
+                auto concreteEntity = spawnEntity.get<TSpawnHandle>();
+
+                return EcsDataContainerFunctionInvoker::invoke<&TConcretePolicy::onBeforeSpawn>(
+                    policy_, ecsDataContainer, pool, concreteEntity
+                );
             }
 
             /**
@@ -152,14 +184,14 @@ export namespace helios::gameplay::spawning {
     public:
 
         /**
-         * @brief Constructs a `SpawnPolicy` wrapping a concrete policy of type `T`.
+         * @brief Constructs a `SpawnPolicy` wrapping a concrete policy of type `TConcretePolicy`.
          *
-         * @tparam T           Concrete spawn policy type.
+         * @tparam TConcretePolicy           Concrete spawn policy type.
          * @param spawnPolicy  Policy instance to wrap (moved into storage).
          */
-        template<typename T>
-        SpawnPolicy(T spawnPolicy)
-        : pimpl_(std::make_unique<Model<T>>(
+        template<typename TConcretePolicy>
+        SpawnPolicy(TConcretePolicy spawnPolicy)
+        : pimpl_(std::make_unique<Model<TConcretePolicy>>(
             std::move(spawnPolicy)
 
         )) {}
@@ -172,22 +204,22 @@ export namespace helios::gameplay::spawning {
         /**
          * @brief Returns the number of entities to spawn in the current frame.
          */
-        std::size_t spawnCount(UpdateContext& updateContext, const SpawnContext& context) {
-            return pimpl_->spawnCount(updateContext, context);
+        std::size_t spawnCount(EcsDataContainer& ecsDataContainer, SpawnContext& spawnContext) {
+            return pimpl_->spawnCount(ecsDataContainer, spawnContext);
         }
 
         /**
          * @brief Executes the spawn logic; returns the number of successfully spawned entities.
          */
-        std::size_t spawn(UpdateContext& updateContext, const SpawnContext& context, std::span<SpawnEntityType> spawnEntities) {
-            return pimpl_->spawn(updateContext, context, spawnEntities);
+        std::size_t spawn(EcsDataContainer& ecsDataContainer, SpawnContext& spawnContext, EntitySpanRef spawnEntities) {
+            return pimpl_->spawn(ecsDataContainer, spawnContext, spawnEntities);
         }
 
         /**
          * @copydoc Concept::onBeforeSpawn
          */
-        bool onBeforeSpawn(EntityPool& pool, SpawnEntityType& entity) {
-            return pimpl_->onBeforeSpawn(pool, entity);
+        bool onBeforeSpawn(EcsDataContainer& ecsDataContainer, EntityPool& pool, EntityRef spawnEntityRef) {
+            return pimpl_->onBeforeSpawn(ecsDataContainer, pool, spawnEntityRef);
         }
 
         /**
@@ -197,21 +229,21 @@ export namespace helios::gameplay::spawning {
          * @param context
          * @return
          */
-        bool update(UpdateContext& updateContext, SpawnContext& context) {
-            return pimpl_->update(updateContext, context);
+        bool update(EcsDataContainer& ecsDataContainer, SpawnContext& spawnContext) {
+            return pimpl_->update(ecsDataContainer, spawnContext);
         }
 
         /**
          * @brief Delegates to `policy_.underlying()` to return a raw pointer to the stored policy.
          */
-        void* underlying() noexcept {
+        [[nodiscard]] void* underlying() noexcept {
             return pimpl_->underlying();
         }
 
         /**
          * @brief Delegates to `policy_.underlying()` to return a const raw pointer to the stored policy.
          */
-        void* underlying() const noexcept {
+        [[nodiscard]] void* underlying() const noexcept {
             return pimpl_->underlying();
         }
 

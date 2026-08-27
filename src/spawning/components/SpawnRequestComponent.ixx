@@ -14,9 +14,9 @@ export namespace helios::gameplay::spawning::components {
 
         using Handle_type = TOwnerHandle;
 
-        engine::runtime::pooling::types::EntityPoolKey<TSpawnHandle> entityPoolKey;
+        engine::runtime::pooling::types::EntityPoolKey entityPoolKey;
 
-        types::SpawnPolicyKey<TOwnerHandle, TSpawnHandle> spawnPolicyKey;
+        types::SpawnPolicyKey spawnPolicyKey;
 
         std::size_t amount;
     };
