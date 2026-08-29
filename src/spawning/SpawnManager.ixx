@@ -30,7 +30,6 @@ import helios.engine.runtime.pooling;
 
 import helios.engine.runtime.world.UpdateContext;
 
-import helios.engine.runtime.world.types;
 import helios.engine.runtime.world.concepts;
 
 import helios.core.log;
