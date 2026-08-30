@@ -6,3 +6,4 @@
 export module helios.gameplay;
 
 export import helios.gameplay.spawning;
+export import helios.gameplay.lifecycle;

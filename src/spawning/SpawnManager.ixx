@@ -23,14 +23,14 @@ import helios.engine.core.types;
 
 import helios.engine.spatial.components;
 
-import helios.engine.runtime.concepts;
+
 
 import helios.engine.runtime.pooling;
 
 
-import helios.engine.runtime.world.UpdateContext;
+import helios.engine.runtime.gameloop.types;
 
-import helios.engine.runtime.world.concepts;
+
 
 import helios.core.log;
 
@@ -42,7 +42,7 @@ export namespace helios::gameplay::spawning {
     class SpawnManager {
 
 
-        using UpdateContext = engine::runtime::world::UpdateContext;
+        using UpdateContext = engine::runtime::gameloop::types::UpdateContext;
         using LogManager = core::log::LogManager;
         using CommandHandlerRegistry = ecs::command::CommandHandlerRegistry;
         using EcsDataContainer = ecs::common::container::EcsDataContainer;
