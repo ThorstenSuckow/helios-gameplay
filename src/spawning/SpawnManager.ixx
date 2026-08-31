@@ -51,11 +51,11 @@ export namespace helios::gameplay::spawning {
         using EntityPoolRegistry = engine::runtime::pooling::EntityPoolRegistry;
         using PoolSnapshot = engine::runtime::pooling::types::PoolSnapshot;
         using EntityPool = engine::runtime::pooling::EntityPool;
-        using SpawnEntityType = ecs::Entity<ecs::EntityManager<TSpawnHandle>>;
-        using EmitterEntityType = ecs::Entity<ecs::EntityManager<TEmitterHandle>>;
+        using SpawnEntityType = ecs::entity::Entity<ecs::entity::EntityManager<TSpawnHandle>>;
+        using EmitterEntityType = ecs::entity::Entity<ecs::entity::EntityManager<TEmitterHandle>>;
         using TypedSpawnContext = types::TypedSpawnContext<TEmitterHandle, TSpawnHandle>;
         using HandleSpanRef = ecs::common::types::HandleSpanRef;
-        using SpawnEntityManager = ecs::EntityManager<TSpawnHandle>;
+        using SpawnEntityManager = ecs::entity::EntityManager<TSpawnHandle>;
         using EntityRef = ecs::EntityRef;
         using EntitySpanRef = ecs::EntitySpanRef;
 
