@@ -14,11 +14,11 @@ export module helios.gameplay.spawning.SpawnPolicy;
 import helios.ecs;
 
 import helios.gameplay.spawning.types;
-import helios.engine.runtime.world.UpdateContext;
+import helios.engine.runtime.gameloop.types;
 import helios.engine.runtime.pooling.EntityPool;
 
 using namespace helios::gameplay::spawning::types;
-using namespace helios::engine::runtime::world;
+
 export namespace helios::gameplay::spawning {
 
 
@@ -39,7 +39,10 @@ export namespace helios::gameplay::spawning {
         using EcsDataContainer = ecs::common::container::EcsDataContainer;
         using EntityRef = ecs::EntityRef;
         using EntitySpanRef = ecs::EntitySpanRef;
-        using EcsDataContainerArgumentResolver = ecs::common::container::EcsDataContainerArgumentResolver;
+
+        template<typename TMutationSink = std::monostate>
+        using EcsDataContainerArgumentResolver = ecs::common::container::EcsDataContainerArgumentResolver<TMutationSink>;
+
         using EcsDataContainerFunctionInvoker = ecs::common::container::EcsDataContainerFunctionInvoker;
 
         /**
