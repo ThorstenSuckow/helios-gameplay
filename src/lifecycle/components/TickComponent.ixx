@@ -20,7 +20,6 @@ export namespace helios::gameplay::lifecycle::components {
 
     public:
 
-        using HandleType = TOwnerHandle;
 
         explicit LifetimeComponent(const float lifetime)
         : lifetime_(lifetime) {}
