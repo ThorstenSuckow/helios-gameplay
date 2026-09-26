@@ -12,7 +12,6 @@ export namespace helios::gameplay::spawning::components {
     template<typename TOwnerHandle, typename TSpawnHandle = TOwnerHandle>
     struct SpawnRequestComponent {
 
-        using HandleType = TOwnerHandle;
 
         engine::runtime::pooling::types::EntityPoolKey entityPoolKey;
 
