@@ -200,7 +200,7 @@ export namespace helios::gameplay::spawning {
         }
 
 
-        bool commit(
+        bool execute(
             UpdateContext& updateContext, SpawnPolicyRegistry& spawnPolicyRegistry,
             EntityPoolRegistry& entityPoolRegistry, SpawnEntityManager& spawnEntityManager,
             EcsDataContainer& ecsDataContainer) noexcept {
