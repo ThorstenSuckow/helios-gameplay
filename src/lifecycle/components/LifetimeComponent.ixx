@@ -10,9 +10,6 @@ export module helios.gameplay.lifecycle.components:LifetimeComponent;
 
 export namespace helios::gameplay::lifecycle::components {
 
-    struct LifetimeComponentDomain{};
-
-    template<typename TOwnerHandle>
     class LifetimeComponent {
         float age_{};
 
