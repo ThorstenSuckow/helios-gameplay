@@ -5,4 +5,6 @@
 
 export module helios.gameplay.lifecycle;
 
+export import :LifetimeManager;
 export import helios.gameplay.lifecycle.components;
+export import helios.gameplay.lifecycle.commands;
