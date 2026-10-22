@@ -4,6 +4,8 @@
  */
 module;
 
+#include <cstdint>
+#include <cmath>
 
 export module helios.gameplay.lifecycle.components:LifetimeComponent;
 
@@ -13,28 +15,41 @@ export namespace helios::gameplay::lifecycle::components {
     class LifetimeComponent {
         float age_{};
 
-        float lifetime_{};
+
+        std::uint32_t tickLifetime_{};
+
+        std::uint32_t ticks_{};
 
     public:
 
 
-        explicit LifetimeComponent(const float lifetime)
-        : lifetime_(lifetime) {}
-
-        void tick (const float deltaTime) noexcept {
-            age_ += deltaTime;
+        static LifetimeComponent fromSeconds(const float lifetimeInSeconds, const float tickDurationInSeconds) {
+            return LifetimeComponent(std::lround(lifetimeInSeconds / tickDurationInSeconds));
         }
 
-        [[nodiscard]] float value() const noexcept {
-            return age_;
+        explicit LifetimeComponent(const std::uint32_t tickLifetime)
+       : tickLifetime_(tickLifetime)
+        {}
+
+        void tick () noexcept {
+            ticks_++;
         }
 
-        [[nodiscard]] float lifetime() const noexcept {
-            return lifetime_;
+        [[nodiscard]] std::uint32_t value() const noexcept {
+            return ticks_;
+        }
+
+
+        [[nodiscard]] std::uint32_t lifetime() const noexcept {
+            return tickLifetime_;
         }
 
         [[nodiscard]] bool isExpired() const noexcept {
-            return age_ >= lifetime_;
+            return ticks_ >= tickLifetime_;
+        }
+
+        [[nodiscard]] float normalizedAge() const noexcept {
+            return isExpired() ? 1.0F : static_cast<float>(ticks_) / static_cast<float>(tickLifetime_);
         }
 
     };
